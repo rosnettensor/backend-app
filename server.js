@@ -11,7 +11,7 @@ const port = process.env.PORT || 5001;
 
 // Enable CORS for frontend requests, using environment variable for frontend URL
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: 'https://preeminent-lamington-2b8cba.netlify.app',
   methods: ['GET', 'POST', 'DELETE'],
 }));
 
