@@ -39,6 +39,9 @@ const upload = multer({ storage });
 app.post('/scan', async (req, res) => {
   const qrData = req.body.qrCodeData;
 
+  // Log incoming QR data
+  console.log('QR Data received:', qrData);
+
   // Validate the QR code data format
   if (!qrData || !qrData.match(/\*A\d+\*/) || !qrData.match(/\*V\d+\*/)) {
     return res.status(400).json({ error: 'Invalid QR code format' });
@@ -49,7 +52,7 @@ app.post('/scan', async (req, res) => {
   const plant = qrData.match(/\*V(\d+)\*/)[1];
 
   try {
-    const result = await pool.query('SELECT * FROM PlantList WHERE "GroupID" = $1 AND "Plant" = $2', [group, plant]);
+    const result = await pool.query('SELECT * FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [group, plant]);
     if (result.rows.length > 0) {
       res.json(result.rows[0]); // Return the plant data if found
     } else {
@@ -57,7 +60,7 @@ app.post('/scan', async (req, res) => {
     }
   } catch (err) {
     console.error('Database error:', err.message);
-    res.status(500).json({ error: 'Database error' });
+    res.status(500).json({ error: 'Database error: ' + err.message }); // Include error message for debugging
   }
 });
 
@@ -77,7 +80,7 @@ app.post('/upload', upload.single('plantImage'), async (req, res) => {
 
   try {
     // Fetch current ImageLinks for the plant
-    const selectResult = await pool.query('SELECT "ImageLinks" FROM PlantList WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
+    const selectResult = await pool.query('SELECT "ImageLinks" FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
 
     // Append new image URL to existing ImageLinks
     let updatedImageLinks = imageUrl;
@@ -86,12 +89,12 @@ app.post('/upload', upload.single('plantImage'), async (req, res) => {
     }
 
     // Update ImageLinks column in the database
-    await pool.query('UPDATE PlantList SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
+    await pool.query('UPDATE "PlantList" SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
     res.status(201).json({ imageUrl }); // Send the new image URL
 
   } catch (err) {
     console.error('Failed to update plant with image:', err.message);
-    res.status(500).json({ error: 'Failed to update plant with image' });
+    res.status(500).json({ error: 'Failed to update plant with image: ' + err.message });
   }
 });
 
@@ -104,12 +107,12 @@ app.delete('/delete-image', async (req, res) => {
   fs.unlink(filePath, async (err) => {
     if (err) {
       console.error('Error deleting image file:', err.message);
-      return res.status(500).json({ error: 'Failed to delete image file' });
+      return res.status(500).json({ error: 'Failed to delete image file: ' + err.message });
     }
 
     try {
       // Fetch current ImageLinks for the plant
-      const selectResult = await pool.query('SELECT "ImageLinks" FROM PlantList WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
+      const selectResult = await pool.query('SELECT "ImageLinks" FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
 
       if (selectResult.rows.length === 0) {
         return res.status(404).json({ error: 'Plant not found' });
@@ -119,11 +122,11 @@ app.delete('/delete-image', async (req, res) => {
       const updatedImageLinks = selectResult.rows[0].ImageLinks.split(',').filter(link => link !== imageUrl).join(',');
 
       // Update the ImageLinks column in the database
-      await pool.query('UPDATE PlantList SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
+      await pool.query('UPDATE "PlantList" SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
       res.status(200).json({ success: true, message: 'Image deleted successfully' });
     } catch (err) {
       console.error('Failed to update ImageLinks:', err.message);
-      res.status(500).json({ error: 'Failed to update ImageLinks' });
+      res.status(500).json({ error: 'Failed to update ImageLinks: ' + err.message });
     }
   });
 });
