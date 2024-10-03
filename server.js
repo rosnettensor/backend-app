@@ -1,5 +1,5 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');  // Use PostgreSQL client
 const multer = require('multer');
 const bodyParser = require('body-parser');
 const fs = require('fs');
@@ -18,13 +18,12 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));  // Serve uploaded images
 
-// Connect to SQLite database
-const db = new sqlite3.Database('./PlantList.db', (err) => {
-  if (err) {
-    console.error('Error opening database:', err.message);
-  } else {
-    console.log('Connected to the SQLite database.');
-  }
+// PostgreSQL connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 // Multer configuration for image uploads
@@ -37,7 +36,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // QR code data processing endpoint
-app.post('/scan', (req, res) => {
+app.post('/scan', async (req, res) => {
   const qrData = req.body.qrCodeData;
 
   // Validate the QR code data format
@@ -49,23 +48,21 @@ app.post('/scan', (req, res) => {
   const group = qrData.match(/\*A(\d+)\*/)[1];
   const plant = qrData.match(/\*V(\d+)\*/)[1];
 
-  // Fetch plant data from the database
-  const sql = 'SELECT * FROM PlantList WHERE GroupID = ? AND Plant = ?';
-  db.get(sql, [group, plant], (err, row) => {
-    if (err) {
-      console.error('Database error:', err.message);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    if (row) {
-      res.json(row);  // Return the plant data if found
+  try {
+    const result = await pool.query('SELECT * FROM PlantList WHERE "GroupID" = $1 AND "Plant" = $2', [group, plant]);
+    if (result.rows.length > 0) {
+      res.json(result.rows[0]);  // Return the plant data if found
     } else {
       res.status(404).json({ error: 'Plant not found' });
     }
-  });
+  } catch (err) {
+    console.error('Database error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
-// Image upload endpoint: Upload image and update ImageLinks column in PlantList.db
-app.post('/upload', upload.single('plantImage'), (req, res) => {
+// Image upload endpoint: Upload image and update ImageLinks column in PostgreSQL
+app.post('/upload', upload.single('plantImage'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
@@ -78,67 +75,56 @@ app.post('/upload', upload.single('plantImage'), (req, res) => {
     return res.status(400).json({ error: 'Group ID and Plant ID are required' });
   }
 
-  // Fetch current ImageLinks for the plant
-  const selectSql = 'SELECT ImageLinks FROM PlantList WHERE GroupID = ? AND Plant = ?';
-  db.get(selectSql, [groupId, plantId], (err, row) => {
-    if (err) {
-      console.error('Failed to fetch plant data:', err.message);
-      return res.status(500).json({ error: 'Failed to fetch plant data' });
-    }
+  try {
+    // Fetch current ImageLinks for the plant
+    const selectResult = await pool.query('SELECT "ImageLinks" FROM PlantList WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
 
     // Append new image URL to existing ImageLinks
     let updatedImageLinks = imageUrl;
-    if (row && row.ImageLinks) {
-      updatedImageLinks = `${row.ImageLinks},${imageUrl}`;
+    if (selectResult.rows.length > 0 && selectResult.rows[0].ImageLinks) {
+      updatedImageLinks = `${selectResult.rows[0].ImageLinks},${imageUrl}`;
     }
 
     // Update ImageLinks column in the database
-    const updateSql = 'UPDATE PlantList SET ImageLinks = ? WHERE GroupID = ? AND Plant = ?';
-    db.run(updateSql, [updatedImageLinks, groupId, plantId], (err) => {
-      if (err) {
-        console.error('Failed to update plant with image:', err.message);
-        return res.status(500).json({ error: 'Failed to update plant with image' });
-      }
+    await pool.query('UPDATE PlantList SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
+    res.status(201).json({ imageUrl });  // Send the new image URL
 
-      res.status(201).json({ imageUrl });  // Send the new image URL
-    });
-  });
+  } catch (err) {
+    console.error('Failed to update plant with image:', err.message);
+    res.status(500).json({ error: 'Failed to update plant with image' });
+  }
 });
 
 // Delete image endpoint: Remove image URL from ImageLinks and delete image file
-app.delete('/delete-image', (req, res) => {
+app.delete('/delete-image', async (req, res) => {
   const { imageUrl, groupId, plantId } = req.body;
 
   // Remove image file from the uploads folder
   const filePath = path.join(__dirname, 'uploads', path.basename(imageUrl));
-  fs.unlink(filePath, (err) => {
+  fs.unlink(filePath, async (err) => {
     if (err) {
       console.error('Error deleting image file:', err.message);
       return res.status(500).json({ error: 'Failed to delete image file' });
     }
 
-    // Remove the image URL from the ImageLinks in the database
-    const selectSql = 'SELECT ImageLinks FROM PlantList WHERE GroupID = ? AND Plant = ?';
-    db.get(selectSql, [groupId, plantId], (err, row) => {
-      if (err) {
-        console.error('Failed to fetch plant data:', err.message);
-        return res.status(500).json({ error: 'Failed to fetch plant data' });
+    try {
+      // Fetch current ImageLinks for the plant
+      const selectResult = await pool.query('SELECT "ImageLinks" FROM PlantList WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
+
+      if (selectResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Plant not found' });
       }
 
       // Filter out the deleted image URL from ImageLinks
-      const updatedImageLinks = row.ImageLinks.split(',').filter(link => link !== imageUrl).join(',');
+      const updatedImageLinks = selectResult.rows[0].ImageLinks.split(',').filter(link => link !== imageUrl).join(',');
 
       // Update the ImageLinks column in the database
-      const updateSql = 'UPDATE PlantList SET ImageLinks = ? WHERE GroupID = ? AND Plant = ?';
-      db.run(updateSql, [updatedImageLinks, groupId, plantId], (err) => {
-        if (err) {
-          console.error('Failed to update ImageLinks:', err.message);
-          return res.status(500).json({ error: 'Failed to update ImageLinks' });
-        }
-
-        res.status(200).json({ success: true, message: 'Image deleted successfully' });
-      });
-    });
+      await pool.query('UPDATE PlantList SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
+      res.status(200).json({ success: true, message: 'Image deleted successfully' });
+    } catch (err) {
+      console.error('Failed to update ImageLinks:', err.message);
+      res.status(500).json({ error: 'Failed to update ImageLinks' });
+    }
   });
 });
 
