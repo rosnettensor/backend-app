@@ -9,7 +9,7 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 5001;
 
-// Enable CORS for frontend requests, using environment variable for frontend URL
+// Enable CORS for frontend requests
 app.use(cors({
   origin: 'https://preeminent-lamington-2b8cba.netlify.app',
   methods: ['GET', 'POST', 'DELETE'],
@@ -60,11 +60,11 @@ app.post('/scan', async (req, res) => {
     }
   } catch (err) {
     console.error('Database error:', err.message);
-    res.status(500).json({ error: 'Database error: ' + err.message }); // Include error message for debugging
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
-// Image upload endpoint: Upload image and update ImageLinks column in PostgreSQL
+// Image upload endpoint
 app.post('/upload', upload.single('plantImage'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
@@ -79,7 +79,6 @@ app.post('/upload', upload.single('plantImage'), async (req, res) => {
   }
 
   try {
-    // Fetch current ImageLinks for the plant
     const selectResult = await pool.query('SELECT "ImageLinks" FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
 
     // Append new image URL to existing ImageLinks
@@ -94,11 +93,11 @@ app.post('/upload', upload.single('plantImage'), async (req, res) => {
 
   } catch (err) {
     console.error('Failed to update plant with image:', err.message);
-    res.status(500).json({ error: 'Failed to update plant with image: ' + err.message });
+    res.status(500).json({ error: 'Failed to update plant with image' });
   }
 });
 
-// Delete image endpoint: Remove image URL from ImageLinks and delete image file
+// Delete image endpoint
 app.delete('/delete-image', async (req, res) => {
   const { imageUrl, groupId, plantId } = req.body;
 
@@ -107,26 +106,23 @@ app.delete('/delete-image', async (req, res) => {
   fs.unlink(filePath, async (err) => {
     if (err) {
       console.error('Error deleting image file:', err.message);
-      return res.status(500).json({ error: 'Failed to delete image file: ' + err.message });
+      return res.status(500).json({ error: 'Failed to delete image file' });
     }
 
     try {
-      // Fetch current ImageLinks for the plant
       const selectResult = await pool.query('SELECT "ImageLinks" FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
 
       if (selectResult.rows.length === 0) {
         return res.status(404).json({ error: 'Plant not found' });
       }
 
-      // Filter out the deleted image URL from ImageLinks
       const updatedImageLinks = selectResult.rows[0].ImageLinks.split(',').filter(link => link !== imageUrl).join(',');
 
-      // Update the ImageLinks column in the database
       await pool.query('UPDATE "PlantList" SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
       res.status(200).json({ success: true, message: 'Image deleted successfully' });
     } catch (err) {
       console.error('Failed to update ImageLinks:', err.message);
-      res.status(500).json({ error: 'Failed to update ImageLinks: ' + err.message });
+      res.status(500).json({ error: 'Failed to update ImageLinks' });
     }
   });
 });
