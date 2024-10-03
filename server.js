@@ -1,5 +1,5 @@
 const express = require('express');
-const { Pool } = require('pg');  // Use PostgreSQL client
+const { Pool } = require('pg'); // Use PostgreSQL client
 const multer = require('multer');
 const bodyParser = require('body-parser');
 const fs = require('fs');
@@ -16,7 +16,7 @@ app.use(cors({
 }));
 
 app.use(bodyParser.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));  // Serve uploaded images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve uploaded images
 
 // PostgreSQL connection pool
 const pool = new Pool({
@@ -51,7 +51,7 @@ app.post('/scan', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM PlantList WHERE "GroupID" = $1 AND "Plant" = $2', [group, plant]);
     if (result.rows.length > 0) {
-      res.json(result.rows[0]);  // Return the plant data if found
+      res.json(result.rows[0]); // Return the plant data if found
     } else {
       res.status(404).json({ error: 'Plant not found' });
     }
@@ -87,7 +87,7 @@ app.post('/upload', upload.single('plantImage'), async (req, res) => {
 
     // Update ImageLinks column in the database
     await pool.query('UPDATE PlantList SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
-    res.status(201).json({ imageUrl });  // Send the new image URL
+    res.status(201).json({ imageUrl }); // Send the new image URL
 
   } catch (err) {
     console.error('Failed to update plant with image:', err.message);
