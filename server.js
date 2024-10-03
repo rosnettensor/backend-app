@@ -131,3 +131,7 @@ app.delete('/delete-image', async (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+// Test route
+app.get('/', (req, res) => {
+  res.send('Welcome to the Plant Nursery API!');
+});
