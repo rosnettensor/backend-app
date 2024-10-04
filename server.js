@@ -9,11 +9,13 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 5001;
 
-// Enable CORS for frontend requests
+// Enable CORS for frontend requests, with pre-flight support
 app.use(cors({
-  origin: 'https://preeminent-lamington-2b8cba.netlify.app',
-  methods: ['GET', 'POST', 'DELETE'],
+  origin: ['https://preeminent-lamington-2b8cba.netlify.app', 'http://localhost:3000'],
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+app.options('*', cors()); // Pre-flight request support for all routes
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve uploaded images
