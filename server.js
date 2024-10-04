@@ -1,6 +1,5 @@
 const express = require('express');
 const { Pool } = require('pg');
-const multer = require('multer');
 const bodyParser = require('body-parser');
 const path = require('path');
 const cors = require('cors');
@@ -18,8 +17,6 @@ app.use(cors({
 
 // Allow preflight requests (OPTIONS) for /scan
 app.options('/scan', cors());
-
-app.options('*', cors()); // Handle preflight requests globally
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
