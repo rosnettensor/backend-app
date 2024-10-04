@@ -11,11 +11,15 @@ const port = process.env.PORT || 5001;
 
 // Enable CORS with robust configuration
 app.use(cors({
-  origin: ['https://preeminent-lamington-2b8cba.netlify.app', 'http://localhost:3000'], // Add frontend URLs
-  methods: ['GET', 'POST', 'OPTIONS'], // Add OPTIONS method for preflight
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers for preflight
-  credentials: true // If you're using credentials or cookies for sessions
+  origin: ['https://preeminent-lamington-2b8cba.netlify.app', 'http://localhost:3000'], // Your frontend URLs
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
+
+// Allow preflight requests (OPTIONS) for /scan
+app.options('/scan', cors());
+
 
 app.options('*', cors()); // Handle preflight requests globally
 
