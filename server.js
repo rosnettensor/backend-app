@@ -20,7 +20,6 @@ app.use(cors({
 // Allow preflight requests (OPTIONS) for /scan
 app.options('/scan', cors());
 
-
 app.options('*', cors()); // Handle preflight requests globally
 
 app.use(bodyParser.json());
@@ -106,6 +105,8 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
+// Test endpoint
 app.get('/', (req, res) => {
   res.send('Welcome to the Plant Nursery API!');
 });
+
