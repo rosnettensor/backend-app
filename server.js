@@ -39,7 +39,6 @@ const upload = multer({ storage });
 app.post('/scan', async (req, res) => {
   const qrData = req.body.qrCodeData;
 
-  // Log incoming QR data
   console.log('QR Data received:', qrData);
 
   // Validate the QR code data format
@@ -64,7 +63,7 @@ app.post('/scan', async (req, res) => {
   }
 });
 
-// Image upload endpoint
+// Image upload endpoint: Upload image and update ImageLinks column in PostgreSQL
 app.post('/upload', upload.single('plantImage'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
@@ -73,7 +72,6 @@ app.post('/upload', upload.single('plantImage'), async (req, res) => {
   const imageUrl = `/uploads/${req.file.filename}`;
   const { groupId, plantId } = req.body;
 
-  // Validate Group ID and Plant ID
   if (!groupId || !plantId) {
     return res.status(400).json({ error: 'Group ID and Plant ID are required' });
   }
@@ -81,15 +79,13 @@ app.post('/upload', upload.single('plantImage'), async (req, res) => {
   try {
     const selectResult = await pool.query('SELECT "ImageLinks" FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
 
-    // Append new image URL to existing ImageLinks
     let updatedImageLinks = imageUrl;
     if (selectResult.rows.length > 0 && selectResult.rows[0].ImageLinks) {
       updatedImageLinks = `${selectResult.rows[0].ImageLinks},${imageUrl}`;
     }
 
-    // Update ImageLinks column in the database
     await pool.query('UPDATE "PlantList" SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
-    res.status(201).json({ imageUrl }); // Send the new image URL
+    res.status(201).json({ imageUrl });
 
   } catch (err) {
     console.error('Failed to update plant with image:', err.message);
@@ -97,41 +93,7 @@ app.post('/upload', upload.single('plantImage'), async (req, res) => {
   }
 });
 
-// Delete image endpoint
-app.delete('/delete-image', async (req, res) => {
-  const { imageUrl, groupId, plantId } = req.body;
-
-  // Remove image file from the uploads folder
-  const filePath = path.join(__dirname, 'uploads', path.basename(imageUrl));
-  fs.unlink(filePath, async (err) => {
-    if (err) {
-      console.error('Error deleting image file:', err.message);
-      return res.status(500).json({ error: 'Failed to delete image file' });
-    }
-
-    try {
-      const selectResult = await pool.query('SELECT "ImageLinks" FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [groupId, plantId]);
-
-      if (selectResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Plant not found' });
-      }
-
-      const updatedImageLinks = selectResult.rows[0].ImageLinks.split(',').filter(link => link !== imageUrl).join(',');
-
-      await pool.query('UPDATE "PlantList" SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupId, plantId]);
-      res.status(200).json({ success: true, message: 'Image deleted successfully' });
-    } catch (err) {
-      console.error('Failed to update ImageLinks:', err.message);
-      res.status(500).json({ error: 'Failed to update ImageLinks' });
-    }
-  });
-});
-
 // Start the server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
-});
-// Test route
-app.get('/', (req, res) => {
-  res.send('Welcome to the Plant Nursery API!');
 });
