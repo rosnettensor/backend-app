@@ -1,5 +1,5 @@
 const express = require('express');
-const { Pool } = require('pg'); // Use PostgreSQL client
+const { Pool } = require('pg');
 const multer = require('multer');
 const bodyParser = require('body-parser');
 const fs = require('fs');
@@ -9,16 +9,18 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 5001;
 
-// Enable CORS for frontend requests, with pre-flight support
+// Enable CORS with robust configuration
 app.use(cors({
-  origin: ['https://preeminent-lamington-2b8cba.netlify.app', 'http://localhost:3000'],
-  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: ['https://preeminent-lamington-2b8cba.netlify.app', 'http://localhost:3000'], // Add frontend URLs
+  methods: ['GET', 'POST', 'OPTIONS'], // Add OPTIONS method for preflight
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allowed headers for preflight
+  credentials: true // If you're using credentials or cookies for sessions
 }));
-app.options('*', cors()); // Pre-flight request support for all routes
+
+app.options('*', cors()); // Handle preflight requests globally
 
 app.use(bodyParser.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve uploaded images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // PostgreSQL connection pool
 const pool = new Pool({
@@ -32,7 +34,7 @@ const pool = new Pool({
 const storage = multer.diskStorage({
   destination: './uploads/',
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Use timestamp to avoid duplicate filenames
+    cb(null, Date.now() + path.extname(file.originalname));
   }
 });
 const upload = multer({ storage });
@@ -65,7 +67,7 @@ app.post('/scan', async (req, res) => {
   }
 });
 
-// Image upload endpoint: Upload image and update ImageLinks column in PostgreSQL
+// Image upload endpoint
 app.post('/upload', upload.single('plantImage'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
