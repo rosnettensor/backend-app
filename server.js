@@ -7,16 +7,15 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 5001;
 
-// Enable CORS with robust configuration
+// Enable CORS with relaxed configuration to troubleshoot CORS issue
 app.use(cors({
-  origin: ['https://preeminent-lamington-2b8cba.netlify.app', 'http://localhost:3000'], // Your frontend URLs
+  origin: '*',  // Allow all origins for now to avoid CORS restrictions
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Allow preflight requests (OPTIONS) for /scan
-app.options('/scan', cors());
+// Handle preflight requests globally
+app.options('*', cors());
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
