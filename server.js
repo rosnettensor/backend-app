@@ -33,15 +33,6 @@ const pool = new Pool({
   },
 });
 
-// Multer configuration for image uploads
-const storage = multer.diskStorage({
-  destination: './uploads/',
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
-const upload = multer({ storage });
-
 // QR code data processing endpoint
 app.post('/scan', async (req, res) => {
   const qrData = req.body.qrCodeData;
@@ -70,7 +61,7 @@ app.post('/scan', async (req, res) => {
   }
 });
 
-// Image upload endpoint
+// Image upload endpoint (unchanged)
 app.post('/upload', upload.single('plantImage'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
@@ -109,4 +100,3 @@ app.listen(port, () => {
 app.get('/', (req, res) => {
   res.send('Welcome to the Plant Nursery API!');
 });
-
