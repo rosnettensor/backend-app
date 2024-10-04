@@ -2,7 +2,6 @@ const express = require('express');
 const { Pool } = require('pg');
 const multer = require('multer');
 const bodyParser = require('body-parser');
-const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 
@@ -35,17 +34,21 @@ const pool = new Pool({
 
 // QR code data processing endpoint
 app.post('/scan', async (req, res) => {
-  const { groupID, plant } = req.body; // We are using groupID and plant
+  const qrData = req.body.qrCodeData;
 
-  console.log('QR Data received:', groupID, plant);
+  console.log('QR Data received:', qrData);
 
-  // Validate the QR code data
-  if (!groupID || !plant) {
-    return res.status(400).json({ error: 'Missing groupID or plant' });
+  // Validate the QR code data format
+  if (!qrData || !qrData.match(/\*A\d+\*/) || !qrData.match(/\*V\d+\*/)) {
+    return res.status(400).json({ error: 'Invalid QR code format' });
   }
 
+  // Extract GroupID and Plant from the QR code data
+  const group = qrData.match(/\*A(\d+)\*/)[1];
+  const plant = qrData.match(/\*V(\d+)\*/)[1];
+
   try {
-    const result = await pool.query('SELECT * FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [groupID, plant]); // Correct column names
+    const result = await pool.query('SELECT * FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [group, plant]);
     if (result.rows.length > 0) {
       res.json(result.rows[0]); // Return the plant data if found
     } else {
@@ -54,36 +57,6 @@ app.post('/scan', async (req, res) => {
   } catch (err) {
     console.error('Database error:', err.message);
     res.status(500).json({ error: 'Database error' });
-  }
-});
-
-// Image upload endpoint (unchanged)
-app.post('/upload', upload.single('plantImage'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-
-  const imageUrl = `/uploads/${req.file.filename}`;
-  const { groupID, plant } = req.body; // Using groupID and plant
-
-  if (!groupID || !plant) {
-    return res.status(400).json({ error: 'Group ID and Plant are required' });
-  }
-
-  try {
-    const selectResult = await pool.query('SELECT "ImageLinks" FROM "PlantList" WHERE "GroupID" = $1 AND "Plant" = $2', [groupID, plant]);
-
-    let updatedImageLinks = imageUrl;
-    if (selectResult.rows.length > 0 && selectResult.rows[0].ImageLinks) {
-      updatedImageLinks = `${selectResult.rows[0].ImageLinks},${imageUrl}`;
-    }
-
-    await pool.query('UPDATE "PlantList" SET "ImageLinks" = $1 WHERE "GroupID" = $2 AND "Plant" = $3', [updatedImageLinks, groupID, plant]);
-    res.status(201).json({ imageUrl });
-
-  } catch (err) {
-    console.error('Failed to update plant with image:', err.message);
-    res.status(500).json({ error: 'Failed to update plant with image' });
   }
 });
 
