@@ -9,15 +9,19 @@ const app = express();
 const port = process.env.PORT || 5001;
 
 // Enable CORS
-app.use(cors({
-  origin: ['https://preeminent-lamington-2b8cba.netlify.app', 'http://localhost:3000'],
+aapp.use(cors({
+  origin: '*',  // Temporary for debugging, remove once it's resolved
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
-// Allow preflight (OPTIONS) requests
-app.options('/scan', cors());
+// Log CORS preflight requests
+app.options('*', (req, res) => {
+  console.log('Preflight request:', req.method, req.headers);
+  res.sendStatus(200);
+});
+
 
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
